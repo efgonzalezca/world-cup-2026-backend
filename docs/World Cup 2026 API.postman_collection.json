@@ -1,0 +1,565 @@
+{
+	"info": {
+		"_postman_id": "fc988829-f139-4045-ac4e-961b9bc8e90f",
+		"name": "World Cup 2026 API",
+		"description": "API REST para la polla mundialista FIFA World Cup 2026.\n\n## Autenticacion\nLa mayoria de endpoints requieren JWT. Usa el endpoint Login y el token se guarda automaticamente en la variable `{{token}}`.\n\n## Variables\n- `{{baseUrl}}`: URL base del backend (default: http://localhost:3000)\n- `{{token}}`: JWT token (se setea automaticamente al hacer login)\n- `{{userId}}`: ID del usuario autenticado (se setea automaticamente al hacer login)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "14790662"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201 || pm.response.code === 200) {",
+									"  const json = pm.response.json();",
+									"  pm.collectionVariables.set('token', json.access_token);",
+									"  pm.collectionVariables.set('userId', json.user.id);",
+									"  pm.test('Login exitoso', () => pm.expect(json.access_token).to.be.a('string'));",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						},
+						"description": "Inicia sesion con email y password. Retorna JWT token y datos del usuario.\n\nEl token se guarda automaticamente en `{{token}}` y el userId en `{{userId}}`."
+					},
+					"response": []
+				}
+			],
+			"description": "Autenticacion y sesion"
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"nickname\": \"miapodo\",\n  \"names\": \"Juan\",\n  \"surnames\": \"Perez\",\n  \"cellphone\": \"3001234567\",\n  \"password\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users"
+							]
+						},
+						"description": "Registra un nuevo usuario. No requiere autenticacion.\n\n**Validaciones:**\n- email: unico, formato valido\n- nickname: unico, 3-20 chars, sin espacios\n- cellphone: formato colombiano (3XXXXXXXXX)\n- password: min 6 chars"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ranking",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users"
+							]
+						},
+						"description": "Retorna el ranking de todos los usuarios activos ordenados por puntaje total (score + podium_score)."
+					},
+					"response": []
+				},
+				{
+					"name": "Update User (Nickname/Password)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nickname\": \"nuevoApodo\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}"
+							]
+						},
+						"description": "Actualiza nickname y/o password del usuario.\n\nCambiar password fuerza logout en otras sesiones via WebSocket."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Podium Prediction",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"champion_team_id\": \"ARG\",\n  \"runner_up_team_id\": \"BRA\",\n  \"third_place_team_id\": \"COL\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}"
+							]
+						},
+						"description": "Actualiza la prediccion de podio.\n\n**Validacion server-side:** Se rechaza con 400 si la fecha actual supera el `podium_deadline` configurado en BD."
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Avatar",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"image\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}/avatar",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}",
+								"avatar"
+							]
+						},
+						"description": "Sube avatar como base64 data URI.\n\n**Validaciones:**\n- Formato: debe iniciar con `data:image/`\n- Tamano: max ~1MB (1.5MB en base64)"
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/reset-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"reset-password"
+							]
+						},
+						"description": "Genera una contrasena temporal (8 chars hex, expira en 15 min).\n\nLa contrasena temporal se loguea en consola del servidor (MAIL no configurado aun)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Predictions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}/matches/all",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}",
+								"matches",
+								"all"
+							]
+						},
+						"description": "Retorna las 104 predicciones del usuario autenticado con puntos discriminados."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Match Predictions (All Users)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/matches/:matchId",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"matches",
+								":matchId"
+							],
+							"variable": [
+								{
+									"key": "matchId",
+									"value": "MATCH_UUID_HERE",
+									"description": "UUID del partido"
+								}
+							]
+						},
+						"description": "Retorna las predicciones de TODOS los participantes activos para un partido especifico.\n\nIncluye puntos si el partido ya se jugo."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Prediction",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"local_score\": 2,\n  \"visitor_score\": 1\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}/matches/:matchId",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}",
+								"matches",
+								":matchId"
+							],
+							"variable": [
+								{
+									"key": "matchId",
+									"value": "MATCH_UUID_HERE",
+									"description": "UUID del partido"
+								}
+							]
+						},
+						"description": "Actualiza la prediccion de un partido.\n\n**Validaciones server-side:**\n- El partido no debe haberse jugado (`has_played = false`)\n- La fecha actual debe ser anterior a `match_date`\n- Solo el usuario autenticado puede modificar sus predicciones"
+					},
+					"response": []
+				}
+			],
+			"description": "Gestion de usuarios, predicciones y podio"
+		},
+		{
+			"name": "Matches",
+			"item": [
+				{
+					"name": "Get All Matches",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/matches",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"matches"
+							]
+						},
+						"description": "Retorna todos los 104 partidos con equipos y resultados."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Matches by Phase",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/matches?phase=group",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"matches"
+							],
+							"query": [
+								{
+									"key": "phase",
+									"value": "group",
+									"description": "Valores: group, round_of_32, round_of_16, quarter, semi, third_place, final"
+								}
+							]
+						},
+						"description": "Filtra partidos por fase del torneo."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Match Result (Admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"local_result\": 2,\n  \"visiting_result\": 1\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/matches/:matchId",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"matches",
+								":matchId"
+							],
+							"variable": [
+								{
+									"key": "matchId",
+									"value": "MATCH_UUID_HERE",
+									"description": "UUID del partido"
+								}
+							]
+						},
+						"description": "Registra el resultado real de un partido. **Solo admin.**\n\nAl registrar:\n1. Marca `has_played = true`\n2. Calcula puntos de TODAS las predicciones\n3. Actualiza score acumulado de cada usuario\n4. Emite eventos WebSocket (resultado + ranking)"
+					},
+					"response": []
+				}
+			],
+			"description": "Partidos del torneo"
+		},
+		{
+			"name": "Teams",
+			"item": [
+				{
+					"name": "Get All Teams",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/teams",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"teams"
+							]
+						},
+						"description": "Retorna los 48 equipos del torneo con ranking FIFA y grupo."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Teams by Group",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/teams?group=K",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"teams"
+							],
+							"query": [
+								{
+									"key": "group",
+									"value": "K",
+									"description": "Codigo del grupo (A-L)"
+								}
+							]
+						},
+						"description": "Filtra equipos por grupo del torneo."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Groups with Teams",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/teams/groups",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"teams",
+								"groups"
+							]
+						},
+						"description": "Retorna los 12 grupos con sus equipos anidados."
+					},
+					"response": []
+				}
+			],
+			"description": "Equipos y grupos del torneo"
+		},
+		{
+			"name": "Config",
+			"item": [
+				{
+					"name": "Get Podium Deadline",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/config/podium-deadline",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"config",
+								"podium-deadline"
+							]
+						},
+						"description": "Retorna la fecha limite para modificar predicciones de podio.\n\n**No requiere autenticacion.** Usado por el frontend para mostrar/bloquear el formulario de podio."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Config (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/config",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"config"
+							]
+						},
+						"description": "Retorna todas las configuraciones. **Solo admin.**"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Config (Admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"key\": \"podium_deadline\",\n  \"value\": \"2026-07-14T00:00:00Z\",\n  \"description\": \"Fecha limite para modificar predicciones de podio\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/config",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"config"
+							]
+						},
+						"description": "Actualiza un valor de configuracion. **Solo admin.**\n\nPara cambiar la fecha limite del podio, actualiza la key `podium_deadline` con el nuevo valor ISO 8601."
+					},
+					"response": []
+				}
+			],
+			"description": "Configuracion de la aplicacion"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "userId",
+			"value": ""
+		}
+	]
+}

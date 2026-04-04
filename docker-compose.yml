@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wc2026-postgres
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-world_cup_2026}
+      POSTGRES_USER: ${DB_USERNAME:-wc2026_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-wc2026_pass}
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-wc2026_user} -d ${DB_DATABASE:-world_cup_2026}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wc2026-backend
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    ports:
+      - '${PORT:-3000}:3000'
+    volumes:
+      - .:/app
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: npm run start:dev
+
+volumes:
+  postgres_data:
+  backend_node_modules:
