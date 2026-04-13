@@ -1,9 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Unique, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Unique, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { User } from './user.entity';
 import { Match } from '../../matches/entities/match.entity';
 
 @Entity('user_matches')
 @Unique(['user_id', 'match_id'])
+@Index('IDX_user_matches_user_id', ['user_id'])
+@Index('IDX_user_matches_match_id', ['match_id'])
 export class UserMatch {
   @PrimaryGeneratedColumn('uuid')
   id: string;

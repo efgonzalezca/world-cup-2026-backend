@@ -1,8 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, OneToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, OneToOne, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { UserMatch } from './user-match.entity';
 import { UserPodium } from './user-podium.entity';
 
 @Entity('users')
+@Index('IDX_users_active_score', ['is_active', 'score'])
+@Index('IDX_users_is_active', ['is_active'])
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;

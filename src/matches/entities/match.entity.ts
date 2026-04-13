@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { Team } from '../../teams/entities/team.entity';
 import { TournamentGroup } from '../../teams/entities/tournament-group.entity';
 import { UserMatch } from '../../users/entities/user-match.entity';
@@ -6,6 +6,9 @@ import { UserMatch } from '../../users/entities/user-match.entity';
 export type MatchPhase = 'group' | 'round_of_32' | 'round_of_16' | 'quarter' | 'semi' | 'third_place' | 'final';
 
 @Entity('matches')
+@Index('IDX_matches_phase', ['phase'])
+@Index('IDX_matches_phase_has_played', ['phase', 'has_played'])
+@Index('IDX_matches_match_date', ['match_date'])
 export class Match {
   @PrimaryGeneratedColumn('uuid')
   id: string;
