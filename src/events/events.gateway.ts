@@ -1,10 +1,12 @@
 import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody, ConnectedSocket, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     credentials: true,
   },
 })
@@ -14,17 +16,55 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(EventsGateway.name);
 
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
+
   handleConnection(client: Socket) {
-    this.logger.log(`Client connected: ${client.id}`);
+    try {
+      const token =
+        client.handshake.auth?.token ||
+        client.handshake.headers?.authorization?.split(' ')[1];
+
+      if (!token) {
+        this.logger.warn(`WS connection rejected (no token): ${client.id}`);
+        client.emit('error', { message: 'Authentication required' });
+        client.disconnect();
+        return;
+      }
+
+      const payload = this.jwtService.verify(token, {
+        secret: this.configService.get<string>('JWT_SECRET'),
+      });
+
+      client.data.userId = payload.sub;
+      client.data.email = payload.email;
+      client.data.role = payload.role;
+
+      // Auto-join user room
+      const room = `user:${payload.sub}`;
+      client.join(room);
+
+      this.logger.log(`WS connected: ${client.id} (user: ${payload.email})`);
+    } catch {
+      this.logger.warn(`WS connection rejected (invalid token): ${client.id}`);
+      client.emit('error', { message: 'Invalid token' });
+      client.disconnect();
+    }
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
+    this.logger.log(`WS disconnected: ${client.id} (user: ${client.data?.email || 'unknown'})`);
   }
 
-  /** Client joins their user-specific room */
   @SubscribeMessage('join')
   handleJoin(@MessageBody() data: { userId: string }, @ConnectedSocket() client: Socket) {
+    // Verify the user can only join their own room
+    if (client.data.userId && client.data.userId !== data.userId) {
+      this.logger.warn(`User ${client.data.userId} tried to join room of user ${data.userId}`);
+      return;
+    }
     const room = `user:${data.userId}`;
     client.join(room);
     this.logger.log(`Client ${client.id} joined room ${room}`);

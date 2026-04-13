@@ -51,14 +51,35 @@ export class UsersController {
     @Request() req,
   ) {
     if (!body.image) throw new BadRequestException('No se envio imagen');
-    // Validate base64 data URI format
-    if (!body.image.startsWith('data:image/')) {
-      throw new BadRequestException('Formato de imagen invalido');
+
+    // Validate base64 data URI format with strict MIME type
+    const mimeMatch = body.image.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,/);
+    if (!mimeMatch) {
+      throw new BadRequestException('Formato de imagen invalido. Solo se permiten: png, jpeg, jpg, gif, webp');
     }
+
+    // Reject SVG (can contain embedded scripts)
+    if (body.image.includes('image/svg')) {
+      throw new BadRequestException('Formato SVG no permitido');
+    }
+
     // Validate size (~1MB in base64 ≈ 1.37MB string)
     if (body.image.length > 1.5 * 1024 * 1024) {
       throw new BadRequestException('La imagen no puede superar 1MB');
     }
+
+    // Check base64 payload doesn't contain executable content
+    const base64Data = body.image.split(',')[1];
+    if (!base64Data) {
+      throw new BadRequestException('Datos de imagen invalidos');
+    }
+
+    const decoded = Buffer.from(base64Data, 'base64').toString('utf8').toLowerCase();
+    const dangerousPatterns = ['<script', 'javascript:', 'onerror', 'onload', 'eval(', '<svg', '<?xml'];
+    if (dangerousPatterns.some((pattern) => decoded.includes(pattern))) {
+      throw new BadRequestException('La imagen contiene contenido no permitido');
+    }
+
     return this.usersService.updateProfileImage(userId, req.user.id, body.image);
   }
 
