@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import * as fs from 'fs';
+import * as path from 'path';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -80,7 +82,25 @@ export class UsersController {
       throw new BadRequestException('La imagen contiene contenido no permitido');
     }
 
-    return this.usersService.updateProfileImage(userId, req.user.id, body.image);
+    // Save file to disk instead of storing base64 in DB
+    const ext = mimeMatch[1] === 'jpeg' ? 'jpg' : mimeMatch[1];
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'avatars');
+    fs.mkdirSync(uploadsDir, { recursive: true });
+
+    const filename = `${userId}.${ext}`;
+    const filePath = path.join(uploadsDir, filename);
+
+    // Remove previous avatar with different extension
+    const extensions = ['png', 'jpg', 'gif', 'webp'];
+    for (const e of extensions) {
+      const old = path.join(uploadsDir, `${userId}.${e}`);
+      if (e !== ext && fs.existsSync(old)) fs.unlinkSync(old);
+    }
+
+    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+
+    const imageUrl = `/uploads/avatars/${filename}`;
+    return this.usersService.updateProfileImage(userId, req.user.id, imageUrl);
   }
 
   @Post('reset-password')
