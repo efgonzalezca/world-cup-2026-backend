@@ -43,7 +43,7 @@ src/
 │   ├── entities/      # Team, TournamentGroup
 │   ├── teams.service.ts
 │   └── teams.controller.ts
-├── events/            # WebSocket Gateway (Socket.io)
+├── events/            # WebSocket Gateway (Socket.io, JWT auth)
 │   └── events.gateway.ts
 ├── seed/              # Seed de datos del torneo
 │   └── seed.service.ts
@@ -124,7 +124,9 @@ src/
 - **Autorizacion**: Cada usuario solo puede modificar sus propios datos
 - **RBAC**: Endpoints admin protegidos con `@Roles('admin')` + `RolesGuard`
 - **Password**: Hash con bcrypt, contrasenas temporales con expiracion de 15 min
-- **Avatares**: Validacion de formato base64 y tamano maximo 1MB
+- **Avatares**: Validacion de formato base64, tamano maximo 1MB y deteccion de patrones XSS (scripts, event handlers)
+- **WebSocket**: Conexiones autenticadas con JWT; se rechaza cualquier conexion sin token valido
+- **Variables de entorno**: Sin valores hardcodeados; se usa `ConfigService.getOrThrow()` para secretos obligatorios
 
 ## WebSocket Events
 
@@ -230,11 +232,29 @@ npm run test:cov      # Tests con coverage
 
 ## Seed de Datos
 
-Al iniciar la aplicacion, si la base de datos esta vacia, se siembra automaticamente:
+El seed **no** se ejecuta automaticamente al iniciar la aplicacion. Se gestiona mediante scripts de npm:
+
+```bash
+# Seed base: grupos, equipos, partidos y configuracion inicial
+npm run seed
+
+# Seed de pruebas: usuarios ficticios con predicciones (solo desarrollo)
+npm run seed:test-data
+```
+
+### Seed base (`npm run seed`)
+Si la base de datos esta vacia, siembra:
 - 12 grupos (A-L)
 - 48 equipos con ranking FIFA oficial
 - 104 partidos (72 fase de grupos + 32 eliminatorias)
 - Configuracion inicial (`podium_deadline`: 2026-07-14)
+
+### Seed de pruebas (`npm run seed:test-data`)
+Carga datos de prueba para desarrollo:
+- Usuarios ficticios con predicciones aleatorias
+- Util para probar el ranking y las vistas de partidos con datos realistas
+
+> **Nota:** Ejecutar primero `npm run seed` antes de `npm run seed:test-data`.
 
 ## Documentacion API
 

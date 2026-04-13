@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TournamentGroup } from '../teams/entities/tournament-group.entity';
@@ -7,7 +7,7 @@ import { Match } from '../matches/entities/match.entity';
 import { AppConfig } from '../app-config/entities/app-config.entity';
 
 @Injectable()
-export class SeedService implements OnModuleInit {
+export class SeedService {
   private readonly logger = new Logger(SeedService.name);
 
   constructor(
@@ -21,7 +21,7 @@ export class SeedService implements OnModuleInit {
     private readonly configRepository: Repository<AppConfig>,
   ) {}
 
-  async onModuleInit() {
+  async seedIfEmpty() {
     const groupCount = await this.groupRepository.count();
     if (groupCount > 0) {
       this.logger.log('Seed data already exists, skipping...');

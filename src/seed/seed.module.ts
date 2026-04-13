@@ -9,5 +9,6 @@ import { AppConfig } from '../app-config/entities/app-config.entity';
 @Module({
   imports: [TypeOrmModule.forFeature([TournamentGroup, Team, Match, AppConfig])],
   providers: [SeedService],
+  exports: [SeedService],
 })
 export class SeedModule {}
