@@ -21,7 +21,6 @@ export class AuthService {
 
     const user = await this.userRepository.findOne({
       where: { email },
-      relations: ['predictions', 'podium'],
     });
 
     if (!user) {

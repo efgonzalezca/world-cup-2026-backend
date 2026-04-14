@@ -1,12 +1,21 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import * as fs from 'fs';
+import { Throttle } from '@nestjs/throttler';
+import { promises as fs } from 'fs';
 import * as path from 'path';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdatePredictionDto } from './dto/update-prediction.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+
+const IMAGE_MAGIC_BYTES: Record<string, number[][]> = {
+  png: [[0x89, 0x50, 0x4E, 0x47]],
+  jpg: [[0xFF, 0xD8, 0xFF]],
+  jpeg: [[0xFF, 0xD8, 0xFF]],
+  gif: [[0x47, 0x49, 0x46, 0x38]],
+  webp: [[0x52, 0x49, 0x46, 0x46]],
+};
 
 @Controller('users')
 export class UsersController {
@@ -19,8 +28,16 @@ export class UsersController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'))
-  async getRanking() {
-    return this.usersService.getRanking();
+  async getRanking(
+    @Request() req,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.usersService.getRanking(
+      parseInt(page || '1', 10),
+      parseInt(limit || '20', 10),
+      req.user.id,
+    );
   }
 
   @Get(':userId/matches/all')
@@ -31,8 +48,16 @@ export class UsersController {
 
   @Get('matches/:matchId')
   @UseGuards(AuthGuard('jwt'))
-  async getMatchPredictions(@Param('matchId') matchId: string) {
-    return this.usersService.getMatchPredictions(matchId);
+  async getMatchPredictions(
+    @Param('matchId') matchId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.usersService.getMatchPredictions(
+      matchId,
+      parseInt(page || '1', 10),
+      parseInt(limit || '30', 10),
+    );
   }
 
   @Patch(':userId')
@@ -54,56 +79,68 @@ export class UsersController {
   ) {
     if (!body.image) throw new BadRequestException('No se envio imagen');
 
-    // Validate base64 data URI format with strict MIME type
     const mimeMatch = body.image.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,/);
     if (!mimeMatch) {
       throw new BadRequestException('Formato de imagen invalido. Solo se permiten: png, jpeg, jpg, gif, webp');
     }
 
-    // Reject SVG (can contain embedded scripts)
     if (body.image.includes('image/svg')) {
       throw new BadRequestException('Formato SVG no permitido');
     }
 
-    // Validate size (~1MB in base64 ≈ 1.37MB string)
     if (body.image.length > 1.5 * 1024 * 1024) {
       throw new BadRequestException('La imagen no puede superar 1MB');
     }
 
-    // Check base64 payload doesn't contain executable content
     const base64Data = body.image.split(',')[1];
     if (!base64Data) {
       throw new BadRequestException('Datos de imagen invalidos');
     }
 
-    const decoded = Buffer.from(base64Data, 'base64').toString('utf8').toLowerCase();
+    const fileBuffer = Buffer.from(base64Data, 'base64');
+
+    const declaredType = mimeMatch[1];
+    const expectedSignatures = IMAGE_MAGIC_BYTES[declaredType];
+    if (!expectedSignatures) {
+      throw new BadRequestException('Formato de imagen no soportado');
+    }
+
+    const matchesMagicBytes = expectedSignatures.some((signature) =>
+      signature.every((byte, index) => fileBuffer[index] === byte),
+    );
+    if (!matchesMagicBytes) {
+      throw new BadRequestException('El contenido del archivo no coincide con el formato declarado');
+    }
+
+    const decoded = fileBuffer.toString('utf8').toLowerCase();
     const dangerousPatterns = ['<script', 'javascript:', 'onerror', 'onload', 'eval(', '<svg', '<?xml'];
     if (dangerousPatterns.some((pattern) => decoded.includes(pattern))) {
       throw new BadRequestException('La imagen contiene contenido no permitido');
     }
 
-    // Save file to disk instead of storing base64 in DB
-    const ext = mimeMatch[1] === 'jpeg' ? 'jpg' : mimeMatch[1];
+    const ext = declaredType === 'jpeg' ? 'jpg' : declaredType;
     const uploadsDir = path.join(process.cwd(), 'uploads', 'avatars');
-    fs.mkdirSync(uploadsDir, { recursive: true });
+    await fs.mkdir(uploadsDir, { recursive: true });
 
     const filename = `${userId}.${ext}`;
     const filePath = path.join(uploadsDir, filename);
 
-    // Remove previous avatar with different extension
     const extensions = ['png', 'jpg', 'gif', 'webp'];
     for (const e of extensions) {
       const old = path.join(uploadsDir, `${userId}.${e}`);
-      if (e !== ext && fs.existsSync(old)) fs.unlinkSync(old);
+      if (e !== ext) {
+        await fs.access(old).then(() => fs.unlink(old)).catch(() => {});
+      }
     }
 
-    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    await fs.writeFile(filePath, fileBuffer);
 
     const imageUrl = `/uploads/avatars/${filename}`;
     return this.usersService.updateProfileImage(userId, req.user.id, imageUrl);
   }
 
   @Post('reset-password')
+  @Throttle({ short: { limit: 3, ttl: 60000 } })
   async requestPasswordReset(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.usersService.requestPasswordReset(resetPasswordDto.email);
   }

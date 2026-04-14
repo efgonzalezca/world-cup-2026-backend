@@ -10,6 +10,7 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   @MinLength(6)
+  @MaxLength(64)
   password?: string;
 
   @IsOptional()

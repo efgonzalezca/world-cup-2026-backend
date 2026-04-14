@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { getDatabaseConfig } from './config/database.config';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -9,11 +11,26 @@ import { TeamsModule } from './teams/teams.module';
 import { EventsModule } from './events/events.module';
 import { SeedModule } from './seed/seed.module';
 import { AppConfigModule } from './app-config/app-config.module';
+import { CacheModule } from './common/cache/cache.module';
+import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware';
 
 @Module({
   imports: [
+    CacheModule,
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot(getDatabaseConfig()),
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 60000,
+        limit: 10,
+      },
+      {
+        name: 'long',
+        ttl: 3600000,
+        limit: 100,
+      },
+    ]),
     AuthModule,
     UsersModule,
     MatchesModule,
@@ -21,6 +38,13 @@ import { AppConfigModule } from './app-config/app-config.module';
     EventsModule,
     SeedModule,
     AppConfigModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    JwtUploadsMiddleware,
   ],
 })
 export class AppModule {}

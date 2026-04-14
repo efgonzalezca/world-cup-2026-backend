@@ -11,6 +11,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdatePredictionDto } from './dto/update-prediction.dto';
 import { EventsGateway } from '../events/events.gateway';
 import { AppConfigService } from '../app-config/app-config.service';
+import { CacheService } from '../common/cache/cache.service';
 
 @Injectable()
 export class UsersService {
@@ -28,6 +29,7 @@ export class UsersService {
     private readonly dataSource: DataSource,
     private readonly eventsGateway: EventsGateway,
     private readonly appConfigService: AppConfigService,
+    private readonly cacheService: CacheService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
@@ -70,6 +72,8 @@ export class UsersService {
       await queryRunner.commitTransaction();
 
       this.logger.log(`User ${email} registered successfully`);
+      this.cacheService.delByPrefix('ranking:');
+      this.eventsGateway.emitUserRegistered();
       const { password: _, ...result } = savedUser;
       return result as Omit<User, 'password'>;
     } catch (error) {
@@ -80,21 +84,67 @@ export class UsersService {
     }
   }
 
-  async getRanking() {
-    const users = await this.userRepository.find({
-      where: { is_active: true },
-      select: ['id', 'nickname', 'score', 'podium_score', 'profile_image'],
-      order: { score: 'DESC' },
-    });
+  async getRanking(page: number, limit: number, currentUserId: string) {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(Math.max(1, limit), 100);
 
-    return users.map((u) => ({
-      id: u.id,
-      nickname: u.nickname,
-      score: u.score,
-      podium_score: u.podium_score,
-      total_score: u.score + u.podium_score,
-      profile_image: u.profile_image,
-    })).sort((a, b) => b.total_score - a.total_score);
+    const cacheKey = `ranking:${safePage}:${safeLimit}:${currentUserId}`;
+    const cached = this.cacheService.get(cacheKey);
+    if (cached) return cached;
+
+    const qb = this.userRepository
+      .createQueryBuilder('u')
+      .select([
+        'u.id AS id',
+        'u.nickname AS nickname',
+        'u.score AS score',
+        'u.podium_score AS podium_score',
+        '(u.score + u.podium_score) AS total_score',
+        'u.profile_image AS profile_image',
+      ])
+      .where('u.is_active = :active', { active: true })
+      .orderBy('(u.score + u.podium_score)', 'DESC')
+      .addOrderBy('u.nickname', 'ASC');
+
+    const total = await qb.getCount();
+
+    const data = await qb
+      .offset((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .getRawMany();
+
+    const currentUser = await this.getUserRankPosition(currentUserId);
+
+    const totalPages = Math.ceil(total / safeLimit);
+    const result = { data, total, page: safePage, limit: safeLimit, totalPages, currentUser };
+    this.cacheService.set(cacheKey, result, 120_000);
+    return result;
+  }
+
+  private async getUserRankPosition(userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId, is_active: true },
+      select: ['id', 'nickname', 'score', 'podium_score', 'profile_image'],
+    });
+    if (!user) return null;
+
+    const totalScore = user.score + user.podium_score;
+
+    const higherCount = await this.userRepository
+      .createQueryBuilder('u')
+      .where('u.is_active = :active', { active: true })
+      .andWhere('(u.score + u.podium_score) > :totalScore', { totalScore })
+      .getCount();
+
+    return {
+      id: user.id,
+      nickname: user.nickname,
+      score: user.score,
+      podium_score: user.podium_score,
+      total_score: totalScore,
+      profile_image: user.profile_image,
+      position: higherCount + 1,
+    };
   }
 
   async getUserPredictions(userId: string, requestUserId: string) {
@@ -105,27 +155,35 @@ export class UsersService {
     });
   }
 
-  async getMatchPredictions(matchId: string) {
+  async getMatchPredictions(matchId: string, page: number, limit: number) {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+
     const match = await this.matchRepository.findOne({ where: { id: matchId } });
     if (!match) throw new NotFoundException('Partido no encontrado');
 
-    // Get all active users
-    const activeUsers = await this.userRepository.find({
+    const [activeUsers, total] = await this.userRepository.findAndCount({
       where: { is_active: true },
       select: ['id', 'nickname'],
       order: { nickname: 'ASC' },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
     });
 
-    // Get existing predictions for this match
-    const predictions = await this.userMatchRepository.find({
-      where: { match_id: matchId },
-      select: ['id', 'user_id', 'local_score', 'visitor_score', 'points', 'discriminated_points'],
-    });
+    const userIds = activeUsers.map((u) => u.id);
+
+    const predictions = userIds.length > 0
+      ? await this.userMatchRepository
+          .createQueryBuilder('um')
+          .select(['um.id', 'um.user_id', 'um.local_score', 'um.visitor_score', 'um.points', 'um.discriminated_points'])
+          .where('um.match_id = :matchId', { matchId })
+          .andWhere('um.user_id IN (:...userIds)', { userIds })
+          .getMany()
+      : [];
 
     const predictionMap = new Map(predictions.map((p) => [p.user_id, p]));
 
-    // Merge: all active users with their prediction (or null values)
-    return activeUsers.map((user) => {
+    const data = activeUsers.map((user) => {
       const pred = predictionMap.get(user.id);
       return {
         id: pred?.id ?? `no-pred-${user.id}`,
@@ -136,6 +194,8 @@ export class UsersService {
         user: { id: user.id, nickname: user.nickname },
       };
     });
+
+    return { data, total, page: safePage, limit: safeLimit };
   }
 
   async updateUser(userId: string, requestUserId: string, updateData: { nickname?: string; password?: string; champion_team_id?: string; runner_up_team_id?: string; third_place_team_id?: string }) {
@@ -149,6 +209,7 @@ export class UsersService {
       if (existing && existing.id !== userId) throw new ConflictException('El nickname ya esta en uso');
       user.nickname = updateData.nickname;
       await this.userRepository.save(user);
+      this.cacheService.delByPrefix('ranking:');
     }
 
     if (updateData.password) {
@@ -157,12 +218,10 @@ export class UsersService {
       user.is_temp_password = false;
       user.temp_password_expires = null;
       await this.userRepository.save(user);
-      // Force logout on all other sessions
       this.eventsGateway.emitForceLogout(userId);
     }
 
     if (updateData.champion_team_id !== undefined || updateData.runner_up_team_id !== undefined || updateData.third_place_team_id !== undefined) {
-      // Validate podium deadline from database
       const deadlineStr = await this.appConfigService.getPodiumDeadline();
       if (deadlineStr) {
         const deadline = new Date(deadlineStr);
@@ -191,7 +250,7 @@ export class UsersService {
     if (!user) throw new NotFoundException('Usuario no encontrado');
     user.profile_image = imageUrl;
     await this.userRepository.save(user);
-    // Notify all clients to refresh this user's avatar
+    this.cacheService.delByPrefix('ranking:');
     this.eventsGateway.emitProfileUpdated(userId, imageUrl);
     const { password: _, ...result } = user;
     return result;
@@ -208,7 +267,7 @@ export class UsersService {
     user.temp_password_expires = new Date(Date.now() + 15 * 60 * 1000);
     await this.userRepository.save(user);
 
-    this.logger.log(`Temporary password generated for ${email}: ${tempPassword}`);
+    this.logger.log(`Temporary password generated for ${email}`);
 
     return { message: 'Contrasena temporal enviada al correo electronico' };
   }
@@ -243,6 +302,7 @@ export class UsersService {
     prediction.visitor_score = dto.visitor_score;
 
     const saved = await this.userMatchRepository.save(prediction);
+    this.cacheService.delByPrefix('matchPredictions:');
     this.eventsGateway.emitPredictionSaved(userId, matchId, dto.local_score, dto.visitor_score);
     this.eventsGateway.emitMatchPredictionUpdated(matchId);
     return saved;

@@ -84,6 +84,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('ranking.updated', { timestamp: new Date().toISOString() });
   }
 
+  emitUserRegistered() {
+    this.server.emit('user.registered', { timestamp: new Date().toISOString() });
+  }
+
   // ── User-specific events (room-based) ──
 
   emitPredictionSaved(userId: string, matchId: string, localScore: number, visitorScore: number) {

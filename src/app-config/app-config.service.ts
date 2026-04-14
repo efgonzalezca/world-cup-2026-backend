@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppConfig } from './entities/app-config.entity';
+import { CacheService } from '../common/cache/cache.service';
 
 @Injectable()
 export class AppConfigService {
@@ -10,11 +11,18 @@ export class AppConfigService {
   constructor(
     @InjectRepository(AppConfig)
     private readonly configRepository: Repository<AppConfig>,
+    private readonly cacheService: CacheService,
   ) {}
 
   async get(key: string): Promise<string | null> {
+    const cacheKey = `config:${key}`;
+    const cached = this.cacheService.get<{ v: string | null }>(cacheKey);
+    if (cached) return cached.v;
+
     const config = await this.configRepository.findOne({ where: { key } });
-    return config?.value ?? null;
+    const value = config?.value ?? null;
+    this.cacheService.set(cacheKey, { v: value }, 3_600_000);
+    return value;
   }
 
   async set(key: string, value: string, description?: string): Promise<AppConfig> {
@@ -25,7 +33,9 @@ export class AppConfigService {
       config.value = value;
       if (description !== undefined) config.description = description;
     }
-    return this.configRepository.save(config);
+    const saved = await this.configRepository.save(config);
+    this.cacheService.del(`config:${key}`);
+    return saved;
   }
 
   async getAll(): Promise<AppConfig[]> {

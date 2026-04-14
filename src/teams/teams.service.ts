@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Team } from './entities/team.entity';
 import { TournamentGroup } from './entities/tournament-group.entity';
+import { CacheService } from '../common/cache/cache.service';
 
 @Injectable()
 export class TeamsService {
@@ -13,23 +14,38 @@ export class TeamsService {
     private readonly teamRepository: Repository<Team>,
     @InjectRepository(TournamentGroup)
     private readonly groupRepository: Repository<TournamentGroup>,
+    private readonly cacheService: CacheService,
   ) {}
 
   async findAll(groupCode?: string) {
+    const cacheKey = `teams:${groupCode || 'all'}`;
+    const cached = this.cacheService.get(cacheKey);
+    if (cached) return cached;
+
     const where: any = {};
     if (groupCode) where.group_code = groupCode;
 
-    return this.teamRepository.find({
+    const data = await this.teamRepository.find({
       where,
       relations: ['group'],
       order: { group_code: 'ASC', fifa_rank: 'ASC' },
     });
+
+    this.cacheService.set(cacheKey, data, 86_400_000);
+    return data;
   }
 
   async findGroups() {
-    return this.groupRepository.find({
+    const cacheKey = 'groups:all';
+    const cached = this.cacheService.get(cacheKey);
+    if (cached) return cached;
+
+    const data = await this.groupRepository.find({
       relations: ['teams'],
       order: { id: 'ASC' },
     });
+
+    this.cacheService.set(cacheKey, data, 86_400_000);
+    return data;
   }
 }

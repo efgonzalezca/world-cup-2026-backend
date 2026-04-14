@@ -8,6 +8,8 @@ import { UserMatch } from './entities/user-match.entity';
 import { UserPodium } from './entities/user-podium.entity';
 import { Match } from '../matches/entities/match.entity';
 import { EventsGateway } from '../events/events.gateway';
+import { AppConfigService } from '../app-config/app-config.service';
+import { CacheService } from '../common/cache/cache.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -20,14 +22,37 @@ describe('UsersService', () => {
     userRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
+      findAndCount: jest.fn(),
       save: jest.fn(),
       create: jest.fn((data) => data),
+      createQueryBuilder: jest.fn(() => ({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(3),
+        getRawMany: jest.fn().mockResolvedValue([
+          { id: '3', nickname: 'carol', score: 15, podium_score: 30, total_score: 45, profile_image: null },
+          { id: '2', nickname: 'bob', score: 20, podium_score: 0, total_score: 20, profile_image: null },
+          { id: '1', nickname: 'alice', score: 10, podium_score: 5, total_score: 15, profile_image: null },
+        ]),
+      })),
     };
     userMatchRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
       save: jest.fn(),
       create: jest.fn((data) => data),
+      createQueryBuilder: jest.fn(() => ({
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      })),
     };
     userPodiumRepo = {
       findOne: jest.fn(),
@@ -56,7 +81,9 @@ describe('UsersService', () => {
         { provide: getRepositoryToken(UserPodium), useValue: userPodiumRepo },
         { provide: getRepositoryToken(Match), useValue: matchRepo },
         { provide: DataSource, useValue: { createQueryRunner: () => mockQueryRunner } },
-        { provide: EventsGateway, useValue: { emitPredictionSaved: jest.fn(), emitForceLogout: jest.fn(), emitProfileUpdated: jest.fn() } },
+        { provide: EventsGateway, useValue: { emitPredictionSaved: jest.fn(), emitForceLogout: jest.fn(), emitProfileUpdated: jest.fn(), emitMatchPredictionUpdated: jest.fn() } },
+        { provide: AppConfigService, useValue: { getPodiumDeadline: jest.fn().mockResolvedValue(null) } },
+        { provide: CacheService, useValue: { get: jest.fn().mockReturnValue(null), set: jest.fn(), del: jest.fn(), delByPrefix: jest.fn() } },
       ],
     }).compile();
 
@@ -64,18 +91,19 @@ describe('UsersService', () => {
   });
 
   describe('getRanking', () => {
-    it('should return users sorted by total_score descending', async () => {
-      userRepo.find.mockResolvedValue([
-        { id: '1', nickname: 'alice', score: 10, podium_score: 5, profile_image: null },
-        { id: '2', nickname: 'bob', score: 20, podium_score: 0, profile_image: null },
-        { id: '3', nickname: 'carol', score: 15, podium_score: 30, profile_image: null },
-      ]);
+    it('should return paginated ranking sorted by total_score descending', async () => {
+      userRepo.findOne.mockResolvedValue({
+        id: '1', nickname: 'alice', score: 10, podium_score: 5, profile_image: null,
+      });
 
-      const ranking = await service.getRanking();
-      expect(ranking[0].nickname).toBe('carol');  // 45
-      expect(ranking[1].nickname).toBe('bob');     // 20
-      expect(ranking[2].nickname).toBe('alice');   // 15
-      expect(ranking[0].total_score).toBe(45);
+      const result: any = await service.getRanking(1, 20, '1');
+      expect(result.data[0].nickname).toBe('carol');
+      expect(result.data[1].nickname).toBe('bob');
+      expect(result.data[2].nickname).toBe('alice');
+      expect(result.data[0].total_score).toBe(45);
+      expect(result.total).toBe(3);
+      expect(result.page).toBe(1);
+      expect(result.currentUser).toBeDefined();
     });
   });
 
