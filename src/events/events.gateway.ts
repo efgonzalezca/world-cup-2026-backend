@@ -1,8 +1,11 @@
-import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody, ConnectedSocket, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody, ConnectedSocket, OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { createAdapter } from '@socket.io/redis-adapter';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from '../common/redis/redis.constants';
 
 @WebSocketGateway({
   cors: {
@@ -10,7 +13,7 @@ import { ConfigService } from '@nestjs/config';
     credentials: true,
   },
 })
-export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit {
   @WebSocketServer()
   server: Server;
 
@@ -19,7 +22,15 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
   ) {}
+
+  afterInit(server: Server) {
+    const pubClient = this.redisClient;
+    const subClient = pubClient.duplicate();
+    server.adapter(createAdapter(pubClient, subClient));
+    this.logger.log('Socket.io Redis adapter initialized');
+  }
 
   handleConnection(client: Socket) {
     try {

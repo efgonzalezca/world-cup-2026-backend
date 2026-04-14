@@ -1,4 +1,5 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { join } from 'path';
 
 export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -8,7 +9,9 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
   password: process.env.DB_PASSWORD || 'wc2026_pass',
   database: process.env.DB_DATABASE || 'world_cup_2026',
   autoLoadEntities: true,
-  synchronize: process.env.NODE_ENV !== 'production',
+  synchronize: false,
+  migrations: [join(__dirname, '..', 'migrations', '*{.ts,.js}')],
+  migrationsRun: true,
   logging: process.env.NODE_ENV === 'development',
   extra: {
     max: parseInt(process.env.DB_POOL_MAX || '20', 10),

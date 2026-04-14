@@ -72,7 +72,7 @@ export class UsersService {
       await queryRunner.commitTransaction();
 
       this.logger.log(`User ${email} registered successfully`);
-      this.cacheService.delByPrefix('ranking:');
+      await this.cacheService.delByPrefix('ranking:');
       this.eventsGateway.emitUserRegistered();
       const { password: _, ...result } = savedUser;
       return result as Omit<User, 'password'>;
@@ -89,7 +89,7 @@ export class UsersService {
     const safeLimit = Math.min(Math.max(1, limit), 100);
 
     const cacheKey = `ranking:${safePage}:${safeLimit}:${currentUserId}`;
-    const cached = this.cacheService.get(cacheKey);
+    const cached = await this.cacheService.get(cacheKey);
     if (cached) return cached;
 
     const qb = this.userRepository
@@ -117,7 +117,7 @@ export class UsersService {
 
     const totalPages = Math.ceil(total / safeLimit);
     const result = { data, total, page: safePage, limit: safeLimit, totalPages, currentUser };
-    this.cacheService.set(cacheKey, result, 120_000);
+    await this.cacheService.set(cacheKey, result, 120_000);
     return result;
   }
 
@@ -209,7 +209,7 @@ export class UsersService {
       if (existing && existing.id !== userId) throw new ConflictException('El nickname ya esta en uso');
       user.nickname = updateData.nickname;
       await this.userRepository.save(user);
-      this.cacheService.delByPrefix('ranking:');
+      await this.cacheService.delByPrefix('ranking:');
     }
 
     if (updateData.password) {
@@ -250,7 +250,7 @@ export class UsersService {
     if (!user) throw new NotFoundException('Usuario no encontrado');
     user.profile_image = imageUrl;
     await this.userRepository.save(user);
-    this.cacheService.delByPrefix('ranking:');
+    await this.cacheService.delByPrefix('ranking:');
     this.eventsGateway.emitProfileUpdated(userId, imageUrl);
     const { password: _, ...result } = user;
     return result;
@@ -302,7 +302,7 @@ export class UsersService {
     prediction.visitor_score = dto.visitor_score;
 
     const saved = await this.userMatchRepository.save(prediction);
-    this.cacheService.delByPrefix('matchPredictions:');
+    await this.cacheService.delByPrefix('matchPredictions:');
     this.eventsGateway.emitPredictionSaved(userId, matchId, dto.local_score, dto.visitor_score);
     this.eventsGateway.emitMatchPredictionUpdated(matchId);
     return saved;

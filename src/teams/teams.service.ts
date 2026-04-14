@@ -19,7 +19,7 @@ export class TeamsService {
 
   async findAll(groupCode?: string) {
     const cacheKey = `teams:${groupCode || 'all'}`;
-    const cached = this.cacheService.get(cacheKey);
+    const cached = await this.cacheService.get(cacheKey);
     if (cached) return cached;
 
     const where: any = {};
@@ -31,13 +31,13 @@ export class TeamsService {
       order: { group_code: 'ASC', fifa_rank: 'ASC' },
     });
 
-    this.cacheService.set(cacheKey, data, 86_400_000);
+    await this.cacheService.set(cacheKey, data, 86_400_000);
     return data;
   }
 
   async findGroups() {
     const cacheKey = 'groups:all';
-    const cached = this.cacheService.get(cacheKey);
+    const cached = await this.cacheService.get(cacheKey);
     if (cached) return cached;
 
     const data = await this.groupRepository.find({
@@ -45,7 +45,7 @@ export class TeamsService {
       order: { id: 'ASC' },
     });
 
-    this.cacheService.set(cacheKey, data, 86_400_000);
+    await this.cacheService.set(cacheKey, data, 86_400_000);
     return data;
   }
 }

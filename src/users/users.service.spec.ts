@@ -83,7 +83,7 @@ describe('UsersService', () => {
         { provide: DataSource, useValue: { createQueryRunner: () => mockQueryRunner } },
         { provide: EventsGateway, useValue: { emitPredictionSaved: jest.fn(), emitForceLogout: jest.fn(), emitProfileUpdated: jest.fn(), emitMatchPredictionUpdated: jest.fn() } },
         { provide: AppConfigService, useValue: { getPodiumDeadline: jest.fn().mockResolvedValue(null) } },
-        { provide: CacheService, useValue: { get: jest.fn().mockReturnValue(null), set: jest.fn(), del: jest.fn(), delByPrefix: jest.fn() } },
+        { provide: CacheService, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue(undefined), del: jest.fn().mockResolvedValue(undefined), delByPrefix: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 

@@ -16,12 +16,12 @@ export class AppConfigService {
 
   async get(key: string): Promise<string | null> {
     const cacheKey = `config:${key}`;
-    const cached = this.cacheService.get<{ v: string | null }>(cacheKey);
+    const cached = await this.cacheService.get<{ v: string | null }>(cacheKey);
     if (cached) return cached.v;
 
     const config = await this.configRepository.findOne({ where: { key } });
     const value = config?.value ?? null;
-    this.cacheService.set(cacheKey, { v: value }, 3_600_000);
+    await this.cacheService.set(cacheKey, { v: value }, 3_600_000);
     return value;
   }
 
@@ -34,7 +34,7 @@ export class AppConfigService {
       if (description !== undefined) config.description = description;
     }
     const saved = await this.configRepository.save(config);
-    this.cacheService.del(`config:${key}`);
+    await this.cacheService.del(`config:${key}`);
     return saved;
   }
 

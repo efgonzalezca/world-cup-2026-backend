@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { BullModule } from '@nestjs/bullmq';
 import { getDatabaseConfig } from './config/database.config';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -12,12 +13,14 @@ import { EventsModule } from './events/events.module';
 import { SeedModule } from './seed/seed.module';
 import { AppConfigModule } from './app-config/app-config.module';
 import { CacheModule } from './common/cache/cache.module';
+import { RedisModule } from './common/redis/redis.module';
 import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware';
 
 @Module({
   imports: [
-    CacheModule,
     ConfigModule.forRoot({ isGlobal: true }),
+    RedisModule,
+    CacheModule,
     TypeOrmModule.forRoot(getDatabaseConfig()),
     ThrottlerModule.forRoot([
       {
@@ -31,6 +34,19 @@ import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware
         limit: 100,
       },
     ]),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get('REDIS_HOST', 'localhost'),
+          port: config.get<number>('REDIS_PORT', 6379),
+          password: config.get('REDIS_PASSWORD', undefined),
+          db: config.get<number>('REDIS_DB', 0),
+          maxRetriesPerRequest: null,
+        },
+      }),
+      inject: [ConfigService],
+    }),
     AuthModule,
     UsersModule,
     MatchesModule,
