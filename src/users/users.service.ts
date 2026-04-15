@@ -1,5 +1,6 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository, DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -27,6 +28,7 @@ export class UsersService {
     @InjectRepository(Match)
     private readonly matchRepository: Repository<Match>,
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
     private readonly eventsGateway: EventsGateway,
     private readonly appConfigService: AppConfigService,
     private readonly cacheService: CacheService,
@@ -41,7 +43,7 @@ export class UsersService {
     const existingNickname = await this.userRepository.findOne({ where: { nickname } });
     if (existingNickname) throw new ConflictException('El nickname ya esta en uso');
 
-    const saltRounds = parseInt(process.env.SALT_ROUNDS || '10', 10) || 10;
+    const saltRounds = this.configService.getOrThrow<number>('SALT_ROUNDS');
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -213,7 +215,7 @@ export class UsersService {
     }
 
     if (updateData.password) {
-      const saltRounds = parseInt(process.env.SALT_ROUNDS || '10', 10) || 10;
+      const saltRounds = this.configService.getOrThrow<number>('SALT_ROUNDS');
       user.password = await bcrypt.hash(updateData.password, saltRounds);
       user.is_temp_password = false;
       user.temp_password_expires = null;
@@ -261,7 +263,7 @@ export class UsersService {
     if (!user) throw new NotFoundException('Correo electronico no registrado');
 
     const tempPassword = crypto.randomBytes(4).toString('hex');
-    const saltRounds = parseInt(process.env.SALT_ROUNDS || '10', 10) || 10;
+    const saltRounds = this.configService.getOrThrow<number>('SALT_ROUNDS');
     user.password = await bcrypt.hash(tempPassword, saltRounds);
     user.is_temp_password = true;
     user.temp_password_expires = new Date(Date.now() + 15 * 60 * 1000);

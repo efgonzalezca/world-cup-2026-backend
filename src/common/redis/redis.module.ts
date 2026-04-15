@@ -11,10 +11,10 @@ import { REDIS_CLIENT } from './redis.constants';
       useFactory: (config: ConfigService) => {
         const logger = new Logger('RedisModule');
         const client = new Redis({
-          host: config.get('REDIS_HOST', 'localhost'),
-          port: config.get<number>('REDIS_PORT', 6379),
-          password: config.get('REDIS_PASSWORD', undefined),
-          db: config.get<number>('REDIS_DB', 0),
+          host: config.getOrThrow<string>('REDIS_HOST'),
+          port: config.getOrThrow<number>('REDIS_PORT'),
+          password: config.get<string>('REDIS_PASSWORD') || undefined,
+          db: config.getOrThrow<number>('REDIS_DB'),
           maxRetriesPerRequest: null,
           lazyConnect: true,
         });

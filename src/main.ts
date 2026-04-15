@@ -1,3 +1,4 @@
+import './config/env.validation';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -25,7 +26,7 @@ async function bootstrap() {
   }));
 
   app.enableCors({
-    origin: configService.get<string>('CORS_ORIGIN', 'http://localhost:5173'),
+    origin: configService.getOrThrow<string>('CORS_ORIGIN'),
     credentials: true,
   });
 
@@ -49,11 +50,11 @@ async function bootstrap() {
 
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  const port = configService.get<number>('PORT', 3000);
+  const port = configService.getOrThrow<number>('PORT');
   await app.listen(port);
 
-  logger.log(`Environment: ${configService.get<string>('NODE_ENV', 'development')}`);
+  logger.log(`Environment: ${configService.getOrThrow<string>('NODE_ENV')}`);
   logger.log(`Application running on port ${port}`);
-  logger.log(`CORS origin: ${configService.get<string>('CORS_ORIGIN', 'http://localhost:5173')}`);
+  logger.log(`CORS origin: ${configService.getOrThrow<string>('CORS_ORIGIN')}`);
 }
 bootstrap();

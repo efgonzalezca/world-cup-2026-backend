@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { UsersService } from './users.service';
@@ -81,6 +82,7 @@ describe('UsersService', () => {
         { provide: getRepositoryToken(UserPodium), useValue: userPodiumRepo },
         { provide: getRepositoryToken(Match), useValue: matchRepo },
         { provide: DataSource, useValue: { createQueryRunner: () => mockQueryRunner } },
+        { provide: ConfigService, useValue: { getOrThrow: jest.fn().mockReturnValue(10), get: jest.fn() } },
         { provide: EventsGateway, useValue: { emitPredictionSaved: jest.fn(), emitForceLogout: jest.fn(), emitProfileUpdated: jest.fn(), emitMatchPredictionUpdated: jest.fn() } },
         { provide: AppConfigService, useValue: { getPodiumDeadline: jest.fn().mockResolvedValue(null) } },
         { provide: CacheService, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue(undefined), del: jest.fn().mockResolvedValue(undefined), delByPrefix: jest.fn().mockResolvedValue(undefined) } },

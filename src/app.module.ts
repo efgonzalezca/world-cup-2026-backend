@@ -38,10 +38,10 @@ import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         connection: {
-          host: config.get('REDIS_HOST', 'localhost'),
-          port: config.get<number>('REDIS_PORT', 6379),
-          password: config.get('REDIS_PASSWORD', undefined),
-          db: config.get<number>('REDIS_DB', 0),
+          host: config.getOrThrow<string>('REDIS_HOST'),
+          port: config.getOrThrow<number>('REDIS_PORT'),
+          password: config.get<string>('REDIS_PASSWORD') || undefined,
+          db: config.getOrThrow<number>('REDIS_DB'),
           maxRetriesPerRequest: null,
         },
       }),
