@@ -32,7 +32,7 @@ export class UsersService {
     private readonly eventsGateway: EventsGateway,
     private readonly appConfigService: AppConfigService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) { }
 
   async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
     const { email, nickname, password, ...rest } = createUserDto;
@@ -43,7 +43,7 @@ export class UsersService {
     const existingNickname = await this.userRepository.findOne({ where: { nickname } });
     if (existingNickname) throw new ConflictException('El nickname ya esta en uso');
 
-    const saltRounds = this.configService.getOrThrow<number>('SALT_ROUNDS');
+    const saltRounds = parseInt(this.configService.getOrThrow<string>('SALT_ROUNDS'), 10);
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -176,11 +176,11 @@ export class UsersService {
 
     const predictions = userIds.length > 0
       ? await this.userMatchRepository
-          .createQueryBuilder('um')
-          .select(['um.id', 'um.user_id', 'um.local_score', 'um.visitor_score', 'um.points', 'um.discriminated_points'])
-          .where('um.match_id = :matchId', { matchId })
-          .andWhere('um.user_id IN (:...userIds)', { userIds })
-          .getMany()
+        .createQueryBuilder('um')
+        .select(['um.id', 'um.user_id', 'um.local_score', 'um.visitor_score', 'um.points', 'um.discriminated_points'])
+        .where('um.match_id = :matchId', { matchId })
+        .andWhere('um.user_id IN (:...userIds)', { userIds })
+        .getMany()
       : [];
 
     const predictionMap = new Map(predictions.map((p) => [p.user_id, p]));
@@ -215,7 +215,7 @@ export class UsersService {
     }
 
     if (updateData.password) {
-      const saltRounds = this.configService.getOrThrow<number>('SALT_ROUNDS');
+      const saltRounds = parseInt(this.configService.getOrThrow<string>('SALT_ROUNDS'), 10);
       user.password = await bcrypt.hash(updateData.password, saltRounds);
       user.is_temp_password = false;
       user.temp_password_expires = null;
@@ -263,7 +263,7 @@ export class UsersService {
     if (!user) throw new NotFoundException('Correo electronico no registrado');
 
     const tempPassword = crypto.randomBytes(4).toString('hex');
-    const saltRounds = this.configService.getOrThrow<number>('SALT_ROUNDS');
+    const saltRounds = parseInt(this.configService.getOrThrow<string>('SALT_ROUNDS'), 10);
     user.password = await bcrypt.hash(tempPassword, saltRounds);
     user.is_temp_password = true;
     user.temp_password_expires = new Date(Date.now() + 15 * 60 * 1000);
