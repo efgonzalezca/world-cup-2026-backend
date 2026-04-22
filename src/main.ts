@@ -30,8 +30,10 @@ async function bootstrap() {
     credentials: true,
   });
 
+  app.setGlobalPrefix('api');
+
   const uploadsAuth = app.get(JwtUploadsMiddleware);
-  app.use('/uploads',
+  app.use('/api/uploads',
     uploadsAuth.use.bind(uploadsAuth),
     express.static(path.join(process.cwd(), 'uploads'), {
       setHeaders: (res) => {

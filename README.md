@@ -68,41 +68,53 @@ src/
 
 ## API Endpoints
 
+Todos los endpoints estan expuestos bajo el prefijo global `/api` para facilitar el despliegue detras de un reverse proxy (Nginx, Traefik, etc.).
+
+### Health Check
+| Metodo | Ruta | Auth | Descripcion |
+|--------|------|------|-------------|
+| GET | `/api/status` | No | Estado del servicio, uptime y timestamp (usado por Docker healthcheck) |
+
 ### Autenticacion
 | Metodo | Ruta | Descripcion |
 |--------|------|-------------|
-| POST | `/auth/login` | Login con email/password, retorna JWT |
+| POST | `/api/auth/login` | Login con email/password, retorna JWT |
 
 ### Usuarios
 | Metodo | Ruta | Auth | Descripcion |
 |--------|------|------|-------------|
-| POST | `/users` | No | Registro de usuario |
-| GET | `/users` | JWT | Ranking de usuarios activos |
-| PATCH | `/users/:userId` | JWT | Actualizar perfil (nickname, password, podio) |
-| POST | `/users/:userId/avatar` | JWT | Subir avatar (base64, max 1MB) |
-| POST | `/users/reset-password` | No | Solicitar contrasena temporal |
-| GET | `/users/:userId/matches/all` | JWT | Todas las predicciones del usuario |
-| GET | `/users/matches/:matchId` | JWT | Predicciones de todos los participantes para un partido |
-| PATCH | `/users/:userId/matches/:matchId` | JWT | Actualizar prediccion de un partido |
+| POST | `/api/users` | No | Registro de usuario |
+| GET | `/api/users` | JWT | Ranking de usuarios activos |
+| PATCH | `/api/users/:userId` | JWT | Actualizar perfil (nickname, password, podio) |
+| POST | `/api/users/:userId/avatar` | JWT | Subir avatar (base64, max 1MB) |
+| POST | `/api/users/reset-password` | No | Solicitar contrasena temporal |
+| GET | `/api/users/:userId/matches/all` | JWT | Todas las predicciones del usuario |
+| GET | `/api/users/matches/:matchId` | JWT | Predicciones de todos los participantes para un partido |
+| PATCH | `/api/users/:userId/matches/:matchId` | JWT | Actualizar prediccion de un partido |
 
 ### Partidos
 | Metodo | Ruta | Auth | Descripcion |
 |--------|------|------|-------------|
-| GET | `/matches?phase=` | JWT | Listar partidos (filtro opcional por fase) |
-| PATCH | `/matches/:matchId` | Admin | Registrar resultado de un partido |
+| GET | `/api/matches?phase=` | JWT | Listar partidos (filtro opcional por fase) |
+| PATCH | `/api/matches/:matchId` | Admin | Registrar resultado de un partido |
 
 ### Equipos
 | Metodo | Ruta | Auth | Descripcion |
 |--------|------|------|-------------|
-| GET | `/teams?group=` | JWT | Listar equipos (filtro opcional por grupo) |
-| GET | `/teams/groups` | JWT | Listar grupos con equipos |
+| GET | `/api/teams?group=` | JWT | Listar equipos (filtro opcional por grupo) |
+| GET | `/api/teams/groups` | JWT | Listar grupos con equipos |
 
 ### Configuracion
 | Metodo | Ruta | Auth | Descripcion |
 |--------|------|------|-------------|
-| GET | `/config/podium-deadline` | No | Obtener fecha limite de podio |
-| GET | `/config` | Admin | Listar toda la configuracion |
-| PATCH | `/config` | Admin | Actualizar un valor de configuracion |
+| GET | `/api/config/podium-deadline` | No | Obtener fecha limite de podio |
+| GET | `/api/config` | Admin | Listar toda la configuracion |
+| PATCH | `/api/config` | Admin | Actualizar un valor de configuracion |
+
+### Archivos estaticos
+| Ruta | Auth | Descripcion |
+|------|------|-------------|
+| `/api/uploads/*` | JWT (middleware) | Avatares y archivos subidos, protegidos con JWT |
 
 ## Sistema de Puntuacion (max 7 pts/partido)
 
@@ -260,5 +272,5 @@ Carga datos de prueba para desarrollo:
 
 La coleccion Postman se encuentra en [`docs/postman-collection.json`](docs/postman-collection.json). Importar en Postman:
 1. File > Import > seleccionar el archivo
-2. Cambiar la variable `{{baseUrl}}` si el backend no corre en `http://localhost:3000`
+2. Cambiar la variable `{{baseUrl}}` si el backend no corre en `http://localhost:3000/api`
 3. Ejecutar el request **Login** para autenticar (el token se setea automaticamente)

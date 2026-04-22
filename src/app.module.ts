@@ -12,6 +12,7 @@ import { TeamsModule } from './teams/teams.module';
 import { EventsModule } from './events/events.module';
 import { SeedModule } from './seed/seed.module';
 import { AppConfigModule } from './app-config/app-config.module';
+import { HealthModule } from './health/health.module';
 import { CacheModule } from './common/cache/cache.module';
 import { RedisModule } from './common/redis/redis.module';
 import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware';
@@ -54,6 +55,7 @@ import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware
     EventsModule,
     SeedModule,
     AppConfigModule,
+    HealthModule,
   ],
   providers: [
     {
@@ -63,4 +65,4 @@ import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware
     JwtUploadsMiddleware,
   ],
 })
-export class AppModule {}
+export class AppModule { }

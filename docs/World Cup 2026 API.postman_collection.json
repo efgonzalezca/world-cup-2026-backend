@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "fc988829-f139-4045-ac4e-961b9bc8e90f",
 		"name": "World Cup 2026 API",
-		"description": "API REST para la polla mundialista FIFA World Cup 2026.\n\n## Autenticacion\nLa mayoria de endpoints requieren JWT. Usa el endpoint Login y el token se guarda automaticamente en la variable `{{token}}`.\n\n## Variables\n- `{{baseUrl}}`: URL base del backend (default: http://localhost:3000)\n- `{{token}}`: JWT token (se setea automaticamente al hacer login)\n- `{{userId}}`: ID del usuario autenticado (se setea automaticamente al hacer login)",
+		"description": "API REST para la polla mundialista FIFA World Cup 2026.\n\n## Autenticacion\nLa mayoria de endpoints requieren JWT. Usa el endpoint Login y el token se guarda automaticamente en la variable `{{token}}`.\n\n## Variables\n- `{{baseUrl}}`: URL base del backend con prefijo /api (default: http://localhost:3000/api)\n- `{{token}}`: JWT token (se setea automaticamente al hacer login)\n- `{{userId}}`: ID del usuario autenticado (se setea automaticamente al hacer login)",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "14790662"
 	},
