@@ -13,6 +13,7 @@ import { UpdatePredictionDto } from './dto/update-prediction.dto';
 import { EventsGateway } from '../events/events.gateway';
 import { AppConfigService } from '../app-config/app-config.service';
 import { CacheService } from '../common/cache/cache.service';
+import { MailService } from '../common/mail/mail.service';
 
 @Injectable()
 export class UsersService {
@@ -32,6 +33,7 @@ export class UsersService {
     private readonly eventsGateway: EventsGateway,
     private readonly appConfigService: AppConfigService,
     private readonly cacheService: CacheService,
+    private readonly mailService: MailService,
   ) { }
 
   async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
@@ -262,14 +264,21 @@ export class UsersService {
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) throw new NotFoundException('Correo electronico no registrado');
 
+    const expiresInMinutes = parseInt(
+      this.configService.get<string>('PASSWORD_RESET_EXPIRES_MINUTES') ?? '15',
+      10,
+    );
     const tempPassword = crypto.randomBytes(4).toString('hex');
+
+    await this.mailService.sendPasswordReset(email, tempPassword, expiresInMinutes);
+
     const saltRounds = parseInt(this.configService.getOrThrow<string>('SALT_ROUNDS'), 10);
     user.password = await bcrypt.hash(tempPassword, saltRounds);
     user.is_temp_password = true;
-    user.temp_password_expires = new Date(Date.now() + 15 * 60 * 1000);
+    user.temp_password_expires = new Date(Date.now() + expiresInMinutes * 60 * 1000);
     await this.userRepository.save(user);
 
-    this.logger.log(`Temporary password generated for ${email}`);
+    this.logger.log(`Temporary password generated and emailed for ${email}`);
 
     return { message: 'Contrasena temporal enviada al correo electronico' };
   }

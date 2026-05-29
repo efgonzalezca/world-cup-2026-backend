@@ -15,6 +15,7 @@ import { AppConfigModule } from './app-config/app-config.module';
 import { HealthModule } from './health/health.module';
 import { CacheModule } from './common/cache/cache.module';
 import { RedisModule } from './common/redis/redis.module';
+import { MailModule } from './common/mail/mail.module';
 import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware';
 
 @Module({
@@ -22,6 +23,7 @@ import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware
     ConfigModule.forRoot({ isGlobal: true }),
     RedisModule,
     CacheModule,
+    MailModule,
     TypeOrmModule.forRoot(getDatabaseConfig()),
     ThrottlerModule.forRoot([
       {
