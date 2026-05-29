@@ -14,13 +14,14 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
     const user = await this.userRepository.findOne({
       where: { email },
+      relations: ['podium'],
     });
 
     if (!user) {

@@ -220,7 +220,7 @@ export class UsersService {
       user.is_temp_password = false;
       user.temp_password_expires = null;
       await this.userRepository.save(user);
-      this.eventsGateway.emitForceLogout(userId);
+      this.eventsGateway.emitForceLogout(userId, 'password_changed');
     }
 
     if (updateData.champion_team_id !== undefined || updateData.runner_up_team_id !== undefined || updateData.third_place_team_id !== undefined) {

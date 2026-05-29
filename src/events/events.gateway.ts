@@ -114,8 +114,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect, 
     this.server.to(`user:${userId}`).emit('profile.updated', { userId, profileImage });
   }
 
-  emitForceLogout(userId: string) {
-    this.logger.log(`Emitting force.logout to room user:${userId}`);
-    this.server.to(`user:${userId}`).emit('force.logout', { userId });
+  emitForceLogout(userId: string, reason: string) {
+    this.logger.log(`Emitting force.logout to room user:${userId} (reason=${reason})`);
+    this.server.to(`user:${userId}`).emit('force.logout', { userId, reason });
+  }
+
+  disconnectUserSockets(userId: string) {
+    this.logger.log(`Disconnecting all sockets in room user:${userId}`);
+    this.server.in(`user:${userId}`).disconnectSockets(true);
   }
 }
