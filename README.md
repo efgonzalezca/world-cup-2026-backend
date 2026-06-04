@@ -27,9 +27,10 @@ src/
 │   ├── dto/           # LoginDto
 │   ├── auth.service.ts
 │   └── auth.controller.ts
-├── users/             # Usuarios, predicciones y podio
+├── users/             # Usuarios, predicciones, podio y gestion admin
 │   ├── entities/      # User, UserMatch, UserPodium
-│   ├── dto/           # CreateUser, UpdateUser, UpdatePrediction, ResetPassword
+│   ├── dto/           # CreateUser, UpdateUser, UpdatePrediction, ResetPassword,
+│   │                  #   AdminListUsers, UpdateUserStatus
 │   ├── users.service.ts
 │   └── users.controller.ts
 ├── matches/           # Partidos y calculo de puntos
@@ -92,6 +93,13 @@ Todos los endpoints estan expuestos bajo el prefijo global `/api` para facilitar
 | GET | `/api/users/matches/:matchId` | JWT | Predicciones de todos los participantes para un partido |
 | PATCH | `/api/users/:userId/matches/:matchId` | JWT | Actualizar prediccion de un partido |
 
+### Gestion de Usuarios (Admin)
+| Metodo | Ruta | Auth | Descripcion |
+|--------|------|------|-------------|
+| GET | `/api/users/admin` | Admin | Listado paginado con filtros (`search`, `status`, `role`, `page`, `limit`) |
+| GET | `/api/users/admin/:userId` | Admin | Detalle de un usuario (sin password) |
+| PATCH | `/api/users/admin/:userId/status` | Admin | Activar/desactivar usuario (`{ is_active }`) |
+
 ### Partidos
 | Metodo | Ruta | Auth | Descripcion |
 |--------|------|------|-------------|
@@ -135,6 +143,7 @@ Todos los endpoints estan expuestos bajo el prefijo global `/api` para facilitar
 - **Predicciones de podio**: No se pueden modificar despues de `podium_deadline` (configurable en BD)
 - **Autorizacion**: Cada usuario solo puede modificar sus propios datos
 - **RBAC**: Endpoints admin protegidos con `@Roles('admin')` + `RolesGuard`
+- **Gestion de usuarios (admin)**: Al desactivar una cuenta se cierra su sesion activa via WebSocket (`force.logout` con motivo `account_disabled`); un admin no puede auto-desactivarse ni desactivar al ultimo admin activo
 - **Password**: Hash con bcrypt, contrasenas temporales con expiracion de 15 min
 - **Avatares**: Validacion de formato base64, tamano maximo 1MB y deteccion de patrones XSS (scripts, event handlers)
 - **WebSocket**: Conexiones autenticadas con JWT; se rechaza cualquier conexion sin token valido
@@ -149,7 +158,7 @@ Todos los endpoints estan expuestos bajo el prefijo global `/api` para facilitar
 | `match.result.updated` | Server -> Client | Resultado de un partido registrado |
 | `ranking.updated` | Server -> Client | Ranking actualizado |
 | `profile.updated` | Server -> Client | Avatar de usuario actualizado |
-| `force.logout` | Server -> Client | Forzar logout (cambio de contrasena) |
+| `force.logout` | Server -> Client | Forzar logout con motivo (`password_changed`, `account_disabled`) |
 
 ## Configuracion
 

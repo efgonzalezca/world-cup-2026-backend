@@ -8,6 +8,10 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdatePredictionDto } from './dto/update-prediction.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { AdminListUsersDto } from './dto/admin-list-users.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 
 const IMAGE_MAGIC_BYTES: Record<string, number[][]> = {
   png: [[0x89, 0x50, 0x4E, 0x47]],
@@ -38,6 +42,31 @@ export class UsersController {
       parseInt(limit || '20', 10),
       req.user.id,
     );
+  }
+
+  @Get('admin')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  async listForAdmin(@Query() query: AdminListUsersDto) {
+    return this.usersService.listForAdmin(query);
+  }
+
+  @Get('admin/:userId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  async getForAdmin(@Param('userId') userId: string) {
+    return this.usersService.getForAdmin(userId);
+  }
+
+  @Patch('admin/:userId/status')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  async setUserActive(
+    @Param('userId') userId: string,
+    @Body() dto: UpdateUserStatusDto,
+    @Request() req,
+  ) {
+    return this.usersService.setActive(req.user.id, userId, dto.is_active);
   }
 
   @Get(':userId/matches/all')

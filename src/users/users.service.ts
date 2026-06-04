@@ -10,6 +10,7 @@ import { UserPodium } from './entities/user-podium.entity';
 import { Match } from '../matches/entities/match.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdatePredictionDto } from './dto/update-prediction.dto';
+import { AdminListUsersDto } from './dto/admin-list-users.dto';
 import { EventsGateway } from '../events/events.gateway';
 import { AppConfigService } from '../app-config/app-config.service';
 import { CacheService } from '../common/cache/cache.service';
@@ -317,5 +318,114 @@ export class UsersService {
     this.eventsGateway.emitPredictionSaved(userId, matchId, dto.local_score, dto.visitor_score);
     this.eventsGateway.emitMatchPredictionUpdated(matchId);
     return saved;
+  }
+
+  async listForAdmin(query: AdminListUsersDto) {
+    const safePage = Math.max(1, query.page ?? 1);
+    const safeLimit = Math.min(Math.max(1, query.limit ?? 20), 100);
+    const status = query.status ?? 'all';
+
+    const qb = this.userRepository
+      .createQueryBuilder('u')
+      .select([
+        'u.id',
+        'u.email',
+        'u.nickname',
+        'u.role',
+        'u.names',
+        'u.surnames',
+        'u.cellphone',
+        'u.score',
+        'u.podium_score',
+        'u.profile_image',
+        'u.is_active',
+        'u.created_at',
+      ]);
+
+    if (query.search) {
+      const term = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(u.email) ILIKE :term OR LOWER(u.nickname) ILIKE :term OR LOWER(u.names) ILIKE :term OR LOWER(u.surnames) ILIKE :term)',
+        { term },
+      );
+    }
+
+    if (status === 'active') {
+      qb.andWhere('u.is_active = :active', { active: true });
+    } else if (status === 'inactive') {
+      qb.andWhere('u.is_active = :active', { active: false });
+    }
+
+    if (query.role) {
+      qb.andWhere('u.role = :role', { role: query.role });
+    }
+
+    qb.orderBy('u.created_at', 'DESC');
+
+    const total = await qb.getCount();
+
+    const users = await qb
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
+      .getMany();
+
+    const data = users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      nickname: u.nickname,
+      role: u.role,
+      names: u.names,
+      surnames: u.surnames,
+      cellphone: u.cellphone,
+      score: u.score,
+      podium_score: u.podium_score,
+      total_score: u.score + u.podium_score,
+      profile_image: u.profile_image,
+      is_active: u.is_active,
+      created_at: u.created_at,
+    }));
+
+    const totalPages = Math.ceil(total / safeLimit);
+    return { data, total, page: safePage, limit: safeLimit, totalPages };
+  }
+
+  async getForAdmin(userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'email', 'nickname', 'role', 'names', 'surnames', 'cellphone', 'score', 'podium_score', 'profile_image', 'is_active', 'is_temp_password', 'created_at', 'updated_at'],
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    return { ...user, total_score: user.score + user.podium_score };
+  }
+
+  async setActive(adminId: string, userId: string, isActive: boolean) {
+    if (adminId === userId) {
+      throw new ForbiddenException('No puedes cambiar el estado de tu propia cuenta');
+    }
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    if (!isActive && user.role === 'admin') {
+      const activeAdmins = await this.userRepository.count({
+        where: { role: 'admin', is_active: true },
+      });
+      if (activeAdmins <= 1) {
+        throw new BadRequestException('No se puede desactivar al ultimo administrador activo');
+      }
+    }
+
+    user.is_active = isActive;
+    await this.userRepository.save(user);
+    await this.cacheService.delByPrefix('ranking:');
+
+    this.logger.log(`User ${user.email} ${isActive ? 'activated' : 'deactivated'} by admin ${adminId}`);
+
+    if (!isActive) {
+      this.eventsGateway.emitForceLogout(userId, 'account_disabled');
+    }
+
+    const { password: _, ...result } = user;
+    return result;
   }
 }
