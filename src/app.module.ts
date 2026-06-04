@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bullmq';
 import { getDatabaseConfig } from './config/database.config';
 import { AuthModule } from './auth/auth.module';
@@ -17,6 +17,7 @@ import { CacheModule } from './common/cache/cache.module';
 import { RedisModule } from './common/redis/redis.module';
 import { MailModule } from './common/mail/mail.module';
 import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware';
+import { TrustedIpThrottlerGuard } from './common/guards/trusted-ip-throttler.guard';
 
 @Module({
   imports: [
@@ -29,12 +30,12 @@ import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware
       {
         name: 'short',
         ttl: 60000,
-        limit: 10,
+        limit: 60,
       },
       {
         name: 'long',
         ttl: 3600000,
-        limit: 100,
+        limit: 1000,
       },
     ]),
     BullModule.forRootAsync({
@@ -62,7 +63,7 @@ import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: TrustedIpThrottlerGuard,
     },
     JwtUploadsMiddleware,
   ],

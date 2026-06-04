@@ -1,5 +1,6 @@
 import './config/env.validation';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as express from 'express';
@@ -12,11 +13,13 @@ import { JwtUploadsMiddleware } from './common/middleware/jwt-uploads.middleware
 async function bootstrap() {
   const isProduction = process.env.NODE_ENV === 'production';
 
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: isProduction
       ? ['error', 'warn', 'log']
       : ['error', 'warn', 'log', 'debug', 'verbose'],
   });
+
+  app.set('trust proxy', 1);
 
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
