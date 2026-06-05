@@ -6,6 +6,7 @@ import { MatchesController } from './matches.controller';
 import { Match } from './entities/match.entity';
 import { UserMatch } from '../users/entities/user-match.entity';
 import { User } from '../users/entities/user.entity';
+import { Team } from '../teams/entities/team.entity';
 import { EventsModule } from '../events/events.module';
 import { AuthModule } from '../auth/auth.module';
 import { SCORE_CALCULATION_QUEUE } from './jobs/score-calculation.constants';
@@ -13,7 +14,7 @@ import { ScoreCalculationProcessor } from './jobs/score-calculation.processor';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Match, UserMatch, User]),
+    TypeOrmModule.forFeature([Match, UserMatch, User, Team]),
     BullModule.registerQueue({ name: SCORE_CALCULATION_QUEUE }),
     EventsModule,
     AuthModule,
