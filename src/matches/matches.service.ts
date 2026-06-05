@@ -4,9 +4,11 @@ import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Match } from './entities/match.entity';
+import { Team } from '../teams/entities/team.entity';
 import { EventsGateway } from '../events/events.gateway';
 import { CacheService } from '../common/cache/cache.service';
 import { UpdateResultDto } from './dto/update-result.dto';
+import { AssignTeamsDto } from './dto/assign-teams.dto';
 import { SCORE_CALCULATION_QUEUE } from './jobs/score-calculation.constants';
 import { ScoreCalculationJobData } from './jobs/score-calculation.job';
 
@@ -17,6 +19,8 @@ export class MatchesService {
   constructor(
     @InjectRepository(Match)
     private readonly matchRepository: Repository<Match>,
+    @InjectRepository(Team)
+    private readonly teamRepository: Repository<Team>,
     @InjectQueue(SCORE_CALCULATION_QUEUE)
     private readonly scoreQueue: Queue<ScoreCalculationJobData>,
     private readonly eventsGateway: EventsGateway,
@@ -64,5 +68,56 @@ export class MatchesService {
     this.logger.log(`Score calculation job enqueued for match ${matchId}`);
 
     return match;
+  }
+
+  async assignTeams(matchId: string, dto: AssignTeamsDto) {
+    const match = await this.matchRepository.findOne({ where: { id: matchId } });
+    if (!match) throw new NotFoundException('Partido no encontrado');
+
+    if (match.phase === 'group') {
+      throw new BadRequestException('Solo se pueden asignar equipos en fases eliminatorias');
+    }
+    if (match.has_played) {
+      throw new BadRequestException('No se pueden modificar equipos de un partido ya jugado');
+    }
+    if (new Date() >= new Date(match.match_date)) {
+      throw new BadRequestException('No se pueden modificar equipos despues de la fecha del partido');
+    }
+
+    const hasLocal = Object.prototype.hasOwnProperty.call(dto, 'local_team_id');
+    const hasVisiting = Object.prototype.hasOwnProperty.call(dto, 'visiting_team_id');
+    if (!hasLocal && !hasVisiting) {
+      throw new BadRequestException('Debe indicar al menos un equipo (local o visitante)');
+    }
+
+    const nextLocal = hasLocal ? dto.local_team_id ?? null : match.local_team_id;
+    const nextVisiting = hasVisiting ? dto.visiting_team_id ?? null : match.visiting_team_id;
+
+    if (nextLocal && nextVisiting && nextLocal === nextVisiting) {
+      throw new BadRequestException('Los equipos local y visitante no pueden ser el mismo');
+    }
+
+    const idsToCheck = [
+      ...(hasLocal && nextLocal ? [nextLocal] : []),
+      ...(hasVisiting && nextVisiting ? [nextVisiting] : []),
+    ];
+    for (const teamId of idsToCheck) {
+      const exists = await this.teamRepository.findOne({ where: { id: teamId } });
+      if (!exists) throw new BadRequestException(`El equipo "${teamId}" no existe`);
+    }
+
+    if (hasLocal) match.local_team_id = nextLocal;
+    if (hasVisiting) match.visiting_team_id = nextVisiting;
+    await this.matchRepository.save(match);
+
+    this.logger.log(`Match ${matchId} teams assigned: local=${match.local_team_id} visiting=${match.visiting_team_id}`);
+
+    await this.cacheService.delByPrefix('matches:');
+    this.eventsGateway.emitMatchTeamsUpdated(matchId);
+
+    return this.matchRepository.findOne({
+      where: { id: matchId },
+      relations: ['local_team', 'visiting_team', 'group'],
+    });
   }
 }

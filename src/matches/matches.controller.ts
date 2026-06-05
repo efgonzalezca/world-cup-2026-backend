@@ -2,6 +2,7 @@ import { Controller, Get, Patch, Param, Body, Query, UseGuards } from '@nestjs/c
 import { AuthGuard } from '@nestjs/passport';
 import { MatchesService } from './matches.service';
 import { UpdateResultDto } from './dto/update-result.dto';
+import { AssignTeamsDto } from './dto/assign-teams.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 
@@ -23,5 +24,15 @@ export class MatchesController {
     @Body() updateResultDto: UpdateResultDto,
   ) {
     return this.matchesService.updateResult(matchId, updateResultDto);
+  }
+
+  @Patch(':matchId/teams')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async assignTeams(
+    @Param('matchId') matchId: string,
+    @Body() assignTeamsDto: AssignTeamsDto,
+  ) {
+    return this.matchesService.assignTeams(matchId, assignTeamsDto);
   }
 }

@@ -91,6 +91,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect, 
     this.server.emit('score.updated', { matchId });
   }
 
+  emitMatchTeamsUpdated(matchId: string) {
+    this.server.emit('match.teams.updated', { matchId });
+  }
+
   emitRankingUpdated() {
     this.server.emit('ranking.updated', { timestamp: new Date().toISOString() });
   }
