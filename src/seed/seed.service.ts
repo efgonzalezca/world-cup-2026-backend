@@ -268,16 +268,24 @@ export class SeedService {
     await this.matchRepository.save(matches);
 
     // ── App Config ────────────────────────────────────────────────────────────
-    const existingConfig = await this.configRepository.count();
-    if (existingConfig === 0) {
-      await this.configRepository.save([
-        {
-          key: 'podium_deadline',
-          value: '2026-07-14T00:00:00Z',
-          description: 'Fecha limite para modificar predicciones de podio (antes de semifinales)',
-        },
-      ]);
-      this.logger.log('Seeded app_config with podium_deadline');
+    const configDefaults = [
+      {
+        key: 'podium_deadline',
+        value: '2026-07-14T00:00:00Z',
+        description: 'Fecha limite para modificar predicciones de podio (antes de semifinales)',
+      },
+      {
+        key: 'reveal_predictions',
+        value: 'false',
+        description: 'Cuando es true, oculta los scores de los demas participantes en GET /users/matches/:matchId hasta que la match_date haya pasado',
+      },
+    ];
+    for (const config of configDefaults) {
+      const existing = await this.configRepository.findOne({ where: { key: config.key } });
+      if (!existing) {
+        await this.configRepository.save(config);
+        this.logger.log(`Seeded app_config with ${config.key}`);
+      }
     }
 
     this.logger.log(`Seeded ${groups.length} groups, ${teams.length} teams, ${matches.length} matches`);
