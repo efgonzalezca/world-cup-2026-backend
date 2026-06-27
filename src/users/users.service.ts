@@ -160,12 +160,92 @@ export class UsersService {
     });
   }
 
+  async getUserMatchResults(userId: string, requestUserId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'nickname'],
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const isOwn = userId === requestUserId;
+    const revealPredictions = isOwn ? false : await this.appConfigService.getRevealPredictions();
+
+    const predictions = await this.userMatchRepository
+      .createQueryBuilder('um')
+      .innerJoin('um.match', 'm')
+      .leftJoin('m.local_team', 'lt')
+      .leftJoin('m.visiting_team', 'vt')
+      .select([
+        'um.id',
+        'um.match_id',
+        'um.local_score',
+        'um.visitor_score',
+        'um.points',
+        'um.discriminated_points',
+        'm.match_date',
+        'm.phase',
+        'm.group_code',
+        'm.local_result',
+        'm.visiting_result',
+        'm.has_played',
+        'lt.id',
+        'lt.name',
+        'vt.id',
+        'vt.name',
+      ])
+      .where('um.user_id = :userId', { userId })
+      .orderBy('m.match_date', 'ASC')
+      .getMany();
+
+    const now = new Date();
+    const data = predictions.map((um) => {
+      const match = um.match;
+      const hideScore = revealPredictions && now < match.match_date;
+      return {
+        id: um.id,
+        match_id: um.match_id,
+        local_score: hideScore ? null : um.local_score,
+        visitor_score: hideScore ? null : um.visitor_score,
+        points: um.points,
+        discriminated_points: um.discriminated_points,
+        match: {
+          match_date: match.match_date,
+          phase: match.phase,
+          group_code: match.group_code,
+          has_played: match.has_played,
+          local_result: match.local_result,
+          visiting_result: match.visiting_result,
+          local_team: match.local_team
+            ? { id: match.local_team.id, name: match.local_team.name }
+            : null,
+          visiting_team: match.visiting_team
+            ? { id: match.visiting_team.id, name: match.visiting_team.name }
+            : null,
+        },
+      };
+    });
+
+    return { user: { id: user.id, nickname: user.nickname }, data };
+  }
+
   async getMatchPredictions(matchId: string, page: number, limit: number) {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(Math.max(1, limit), 100);
 
-    const match = await this.matchRepository.findOne({ where: { id: matchId } });
+    const [match, revealPredictions] = await Promise.all([
+      this.matchRepository.findOne({ where: { id: matchId } }),
+      this.appConfigService.getRevealPredictions(),
+    ]);
     if (!match) throw new NotFoundException('Partido no encontrado');
+
+    const matchStarted = new Date() >= match.match_date;
+
+    if (revealPredictions && !matchStarted) {
+      return {
+        predictions_visible: false,
+        message: 'Los resultados de los participantes estaran disponibles una vez que el partido haya iniciado',
+      };
+    }
 
     const [activeUsers, total] = await this.userRepository.findAndCount({
       where: { is_active: true },
@@ -200,7 +280,7 @@ export class UsersService {
       };
     });
 
-    return { data, total, page: safePage, limit: safeLimit };
+    return { data, total, page: safePage, limit: safeLimit, predictions_visible: true };
   }
 
   async updateUser(userId: string, requestUserId: string, updateData: { nickname?: string; password?: string; champion_team_id?: string; runner_up_team_id?: string; third_place_team_id?: string }) {

@@ -75,6 +75,12 @@ export class UsersController {
     return this.usersService.getUserPredictions(userId, req.user.id);
   }
 
+  @Get(':userId/matches/results')
+  @UseGuards(AuthGuard('jwt'))
+  async getUserMatchResults(@Param('userId') userId: string, @Request() req) {
+    return this.usersService.getUserMatchResults(userId, req.user.id);
+  }
+
   @Get('matches/:matchId')
   @UseGuards(AuthGuard('jwt'))
   async getMatchPredictions(

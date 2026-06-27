@@ -45,4 +45,9 @@ export class AppConfigService {
   async getPodiumDeadline(): Promise<string | null> {
     return this.get('podium_deadline');
   }
+
+  async getRevealPredictions(): Promise<boolean> {
+    const value = await this.get('reveal_predictions');
+    return value === 'true';
+  }
 }
