@@ -9,9 +9,13 @@ export type MatchPhase = 'group' | 'round_of_32' | 'round_of_16' | 'quarter' | '
 @Index('IDX_matches_phase', ['phase'])
 @Index('IDX_matches_phase_has_played', ['phase', 'has_played'])
 @Index('IDX_matches_match_date', ['match_date'])
+@Index('IDX_matches_match_number', ['match_number'], { unique: true })
 export class Match {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'int', nullable: true })
+  match_number: number | null;
 
   @Column({ type: 'enum', enum: ['group', 'round_of_32', 'round_of_16', 'quarter', 'semi', 'third_place', 'final'] })
   phase: MatchPhase;
